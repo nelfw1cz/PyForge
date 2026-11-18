@@ -3,17 +3,14 @@
 #include <QRegularExpression>
 #include <QTextCharFormat>
 #include <QVector>
+#include <QTimer>
+#include <QColor>
 
-// ─────────────────────────────────────────────────────────────
-// Подсветка Python: ключевые слова, числа, декораторы, имена
-// функций после def, строки (включая '''многострочные''') и
-// комментарии. Строки и комментарии обрабатываются одним
-// проходом, поэтому '#' внутри строки не считается комментарием.
-// ─────────────────────────────────────────────────────────────
 class CodeHighlighter : public QSyntaxHighlighter {
     Q_OBJECT
 public:
     explicit CodeHighlighter(QTextDocument* parent);
+    void setAnimationEnabled(bool enabled);
 
 protected:
     void highlightBlock(const QString& text) override;
@@ -23,11 +20,16 @@ private:
 
     struct Rule {
         QRegularExpression re;
-        int group = 0;            // какая захваченная группа красится
+        int group = 0;
         QTextCharFormat fmt;
+        QColor baseColor; // Храним базовый цвет для анимации
     };
-
+    QColor m_stringBase;
+    QColor m_commentBase;
     QVector<Rule> m_rules;
     QTextCharFormat m_stringFmt;
     QTextCharFormat m_commentFmt;
+    QTimer* m_pulseTimer = nullptr;
+    qreal   m_phase = 0.0;
+    bool    m_animating = true;
 };

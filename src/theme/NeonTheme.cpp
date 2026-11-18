@@ -1,5 +1,4 @@
 #include "NeonTheme.h"
-
 #include <QApplication>
 #include <QPainter>
 #include <QPainterPath>
@@ -52,15 +51,34 @@ QToolTip { background: #1a1f28; color: #dfe5f0; border: 1px solid #39424f;
                               border: 1px solid rgba(255,176,46,.5); }
 
 /* ═══════ Консоль вывода ═══════ */
-#Console { background: #0d1016; color: #9aa5b8;
-           border: 1px solid #232a36; border-radius: 10px; padding: 6px; }
-
-/* ═══════ Панель шаблонов (стандартный режим) ═══════ */
-#SnippetBar { background: #12151c; border: 1px solid #232a36; border-radius: 10px; }
-#DimCaption { color: #5d687c; font-size: 10px; letter-spacing: 2px; }
-#SnippetChip { background: #1a2029; border: 1px solid #2a3342; color: #c6cedd;
-               border-radius: 7px; padding: 4px 10px; }
-#SnippetChip:hover { border-color: #22d3ee; color: #22d3ee; }
+QPlainTextEdit#Console {
+    background-color: rgba(16, 19, 26, 200);
+    border: 1px solid rgba(255, 255, 255, 20);
+    border-radius: 10px;
+    color: #9aa5b8;
+    padding: 6px;
+}
+/* ═/* ═══════════ GLASSMORPHISM SNIPPETBAR ═══════════ */
+QWidget#SnippetBar {
+    background-color: rgba(20, 24, 32, 180);
+    border: 1px solid rgba(255, 255, 255, 25);
+    border-radius: 12px;
+}
+QPushButton#SnippetChip {
+    background-color: rgba(255, 255, 255, 15);
+    border: 1px solid rgba(255, 255, 255, 20);
+    border-radius: 8px;
+    color: #cdd6f4;
+    padding: 6px 14px;
+    font-weight: bold;
+}
+QPushButton#SnippetChip:hover {
+    background-color: rgba(102, 217, 239, 40);
+    border-color: rgba(102, 217, 239, 100);
+}
+QPushButton#SnippetChip:pressed {
+    background-color: rgba(102, 217, 239, 80);
+}
 
 /* ═══════ Игровой HUD (RPG) ═══════ */
 #HudPanel { background: #12151c; border: 1px solid rgba(255,77,133,.35); border-radius: 12px; }
@@ -180,4 +198,7 @@ QIcon NeonTheme::icon(const QString& kind) {
         }
     }
     return QIcon(px);
+}
+    QString NeonTheme::styleSheet() {
+    return baseQss(); // baseQss() уже существует у тебя на строке 11
 }

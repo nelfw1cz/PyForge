@@ -56,22 +56,37 @@ protected:
         
         const QPointF light = m_mod->m_lightPos;
         
-        // Аура света
+        // Аура света (тёплое оранжевое свечение факела)
         QRadialGradient grad(light, kMaxGlow * 2.5);
-        grad.setColorAt(0.0, QColor(255, 220, 180, 60));   
-        grad.setColorAt(0.3, QColor(255, 180, 100, 30));   
+        grad.setColorAt(0.0, QColor(255, 140, 0, 80));   
+        grad.setColorAt(0.3, QColor(255, 100, 0, 40));   
         grad.setColorAt(1.0, QColor(0, 0, 0, 0));          
         p.setPen(Qt::NoPen);
         p.setBrush(grad);
         p.drawEllipse(light, kMaxGlow * 2.5, kMaxGlow * 2.5);
         
-        // Яркое ядро
-        QRadialGradient coreGrad(light, kLightRadius);
-        coreGrad.setColorAt(0.0, QColor(255, 255, 255, 255));
-        coreGrad.setColorAt(0.7, QColor(255, 230, 180, 200));
-        coreGrad.setColorAt(1.0, QColor(255, 180, 100, 0));
-        p.setBrush(coreGrad);
-        p.drawEllipse(light, kLightRadius, kLightRadius);
+        // 🔥 РИСУЕМ ФАКЕЛ
+        // Древко (коричневая палка)
+        p.setBrush(QColor(101, 67, 33));
+        p.setPen(QPen(QColor(60, 40, 20), 1));
+        p.drawRect(int(light.x()) - 3, int(light.y()) + 5, 6, 25);
+        
+        // Обмотка (верёвка)
+        p.setPen(QPen(QColor(139, 115, 85), 2));
+        p.drawLine(int(light.x()) - 4, int(light.y()) + 8, int(light.x()) + 4, int(light.y()) + 10);
+        p.drawLine(int(light.x()) - 4, int(light.y()) + 12, int(light.x()) + 4, int(light.y()) + 14);
+        
+        // Пламя (несколько слоёв для объёма)
+        p.setPen(Qt::NoPen);
+        // Внешнее пламя (оранжевое)
+        p.setBrush(QColor(255, 100, 0, 200));
+        p.drawEllipse(QPointF(light.x(), light.y() - 2), 10, 14);
+        // Среднее пламя (жёлтое)
+        p.setBrush(QColor(255, 180, 0, 220));
+        p.drawEllipse(QPointF(light.x(), light.y() - 4), 7, 10);
+        // Ядро (белое горячее)
+        p.setBrush(QColor(255, 255, 200, 255));
+        p.drawEllipse(QPointF(light.x(), light.y() - 5), 4, 6);
     }
     
     void mousePressEvent(QMouseEvent* e) override {
@@ -131,6 +146,11 @@ void RtxLightModule::activate() {
     m_overlay->raise();
     m_overlay->updateGeometry(); // Синхронизируем размер
     m_overlay->updateShadows();  // Рассчитываем тени
+    if (m_editor->document()) {
+        // Находим хайлайтер через document()->syntaxHighlighters()
+        // Но проще: передадим указатель на хайлайтер из EditorWindow
+        // Пока оставим комментарий TODO для следующего пункта
+    }
 }
 
 void RtxLightModule::deactivate() {

@@ -29,6 +29,8 @@ inline QColor red()    { return {255, 92, 92}; }
 namespace NeonTheme {
 // Применяет шрифт, стиль-базу Fusion и глобальный QSS ко всему приложению
 void apply();
+// Возвращает QSS-строку для применения через setStyleSheet()
+QString styleSheet();
 // Рисует иконки кодом (QPainter) — не зависят от системных шрифтов/тем.
 // kind: "code" | "rpg" | "graph" | "clock" | "pen"
 QIcon icon(const QString& kind);

@@ -18,7 +18,7 @@ class MindMapWidget;
 class TimeTravelModule;
 class ScratchpadModule;
 class RtxLightModule; // Forward declaration
-
+class BackgroundManager;
 // ─────────────────────────────────────────────────────────────
 // EditorWindow — контекст «Стратегии». Владеет редактором,
 // консолью и всеми модулями-режимами. Одновременно активен
@@ -30,6 +30,10 @@ class EditorWindow : public QWidget {
     Q_OBJECT
 public:
     explicit EditorWindow(QWidget* parent = nullptr);
+    
+enum class Theme { Neon, Jungle, Medieval };
+Theme m_currentTheme = Theme::Neon;
+void applyTheme(Theme theme);
 
 protected:
     void paintEvent(QPaintEvent*) override;         // антрацитовый корпус со скруглениями
@@ -67,6 +71,7 @@ private:
     MindMapWidget*     m_map  = nullptr;
     TimeTravelModule*  m_time = nullptr;
     ScratchpadModule*  m_pad  = nullptr;
+    BackgroundManager* m_bgManager = nullptr;
     RtxLightModule* m_rtx = nullptr; // <--- ДОБАВЬ ЭТУ СТРОЧКУ
     QProcess* m_process = nullptr;
     QString   m_lastStderr;                 // копим stderr для вердикта RPG-режима

@@ -29,8 +29,33 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
-#include <QStatusBar> // Для показа сообщений о сохранении
+#include <QStatusBar>
+#include "theme/JungleTheme.h"
+#include "theme/MedievalTheme.h"
+#include <QApplication>
+#include "ui/BackgroundManager.h"
 
+void EditorWindow::applyTheme(Theme theme) {
+    m_currentTheme = theme;
+    
+    auto* app = qobject_cast<QApplication*>(QCoreApplication::instance());
+    if (!app) return;
+    
+    switch (theme) {
+    case Theme::Neon:
+        app->setStyleSheet(NeonTheme::styleSheet());
+        break;
+    case Theme::Jungle:
+        app->setStyleSheet(JungleTheme::styleSheet());
+        break;
+    case Theme::Medieval:
+        app->setStyleSheet(MedievalTheme::styleSheet());
+        break;
+    }
+    
+    // Обновить иконки sidebar под новую тему
+    // ... цикл по кнопкам с setIcon(...)
+}
 // Демо-код: на нём сразу видно подсветку, автоотступ и граф вызовов
 static const char *kDefaultCode = R"PY(# PyForge — демо-скрипт.
 # Переключайте режимы на панели слева: RPG, карта связей, машина времени, заметки.
@@ -100,7 +125,11 @@ void EditorWindow::buildUi()
     bodyLay->setContentsMargins(0, 0, 0, 0);
     bodyLay->setSpacing(0);
     root->addWidget(body, 1);
-
+    auto* scTheme = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_T), this);
+    connect(scTheme, &QShortcut::activated, this, [this]{
+        int next = (static_cast<int>(m_currentTheme) + 1) % 3;
+        applyTheme(static_cast<Theme>(next));
+    });
     // ── Sidebar: узкая колонка с иконками режимов ──
     auto *side = new QWidget(body);
     side->setObjectName("Sidebar");
@@ -222,7 +251,25 @@ void EditorWindow::setMode(int mode) {
 }
 
 // ─────────────────── Запуск скрипта (QProcess) ───────────────────
-
+// ─────────────────────────────────────────────────────────────
+// Ищем живой интерпретатор Python: py -> python -> python3
+// ─────────────────────────────────────────────────────────────
+static QString detectPython() {
+    const QStringList candidates = {
+        QStringLiteral("py"),       // Windows Python Launcher
+        QStringLiteral("python"),   // Стандартное имя
+        QStringLiteral("python3"),  // Linux/Mac
+    };
+    
+    for (const QString& exe : candidates) {
+        QProcess probe;
+        probe.start(exe, { QStringLiteral("--version") });
+        if (probe.waitForFinished(4000) && probe.exitCode() == 0) {
+            return exe; // Нашли рабочий!
+        }
+    }
+    return QString(); // Ничего не подошло
+}
 void EditorWindow::runScript()
 {
     // Повторный клик во время выполнения = аварийная остановка
@@ -250,12 +297,17 @@ void EditorWindow::runScript()
     m_title->setBusy(true);
 
     m_process = new QProcess(this);
-    const QString python =
-#ifdef Q_OS_WIN
-        QStringLiteral("python");
-#else
-        QStringLiteral("python3");
-#endif
+    
+    // 🔍 Умный поиск интерпретатора Python
+    const QString python = detectPython();
+    if (python.isEmpty()) {
+        m_console->appendPlainText(QStringLiteral(
+            "❌ Интерпретатор Python не найден.\n"
+            "   Установи Python 3 с python.org (галочка 'Add to PATH')\n"
+            "   или убедись, что команда 'py' / 'python' доступна в PATH."));
+        m_title->setBusy(false);
+        return;
+    }
 
     // Стримим вывод по мере поступления
     connect(m_process, &QProcess::readyReadStandardOutput, this, [this]
@@ -288,7 +340,7 @@ void EditorWindow::runScript()
         m_process = nullptr; });
 
     m_process->setWorkingDirectory(dir.path());
-    m_process->start(python, {path});
+    m_process->start(python, { QStringLiteral("-X"), QStringLiteral("utf8"), path });
 }
 
 // ─────────────── Внешний вид и ресайз безрамочного окна ───────────────
