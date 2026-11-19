@@ -33,7 +33,8 @@
 #include "theme/JungleTheme.h"
 #include "theme/MedievalTheme.h"
 #include <QApplication>
-#include "ui/BackgroundManager.h"
+#include <QCloseEvent>
+#include <QUrl>
 
 void EditorWindow::applyTheme(Theme theme) {
     m_currentTheme = theme;
@@ -52,9 +53,27 @@ void EditorWindow::applyTheme(Theme theme) {
         app->setStyleSheet(MedievalTheme::styleSheet());
         break;
     }
-    
+
+    // Глобальный QSS темы перекрывается inline-стилями сцены/редактора
+    // (остаток от «своего» фона, установленного setBackground). Сбрасываем их,
+    // иначе после Ctrl+T фон картинки «переживает» смену темы.
+    resetStageStyleSheet();
+
     // Обновить иконки sidebar под новую тему
     // ... цикл по кнопкам с setIcon(...)
+}
+
+// Убирает inline-QSS, навязанный фоном, и возвращает тему-фон в редактор.
+void EditorWindow::resetStageStyleSheet()
+{
+    m_bgImagePath.clear();
+    m_stage->setStyleSheet(QString());
+    m_editor->setStyleSheet(QStringLiteral(
+        "QPlainTextEdit#CodeEditor{ background-color: rgba(16, 19, 26, 180); }"));
+    m_stage->style()->unpolish(m_stage);
+    m_stage->style()->polish(m_stage);
+    m_editor->style()->unpolish(m_editor);
+    m_editor->style()->polish(m_editor);
 }
 // Демо-код: на нём сразу видно подсветку, автоотступ и граф вызовов
 static const char *kDefaultCode = R"PY(# PyForge — демо-скрипт.
@@ -104,6 +123,17 @@ EditorWindow::EditorWindow(QWidget *parent) : QWidget(parent)
     connect(scSave, &QShortcut::activated, this, &EditorWindow::saveFile);
     auto *scBg = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_B), this);
     connect(scBg, &QShortcut::activated, this, &EditorWindow::setBackground);
+
+    // Индикатор несохранённых изменений: «*» в заголовке окна
+    connect(m_editor->document(), &QTextDocument::modificationChanged,
+            this, [this](bool changed){
+        if (changed) updateTitleBarPath();
+        else setWindowTitle(QStringLiteral("PyForge — %1")
+                                .arg(m_currentFilePath.isEmpty()
+                                         ? QStringLiteral("Безымянный")
+                                         : QFileInfo(m_currentFilePath).fileName()));
+    });
+
     setMode(0); // стандартный режим по умолчанию
 }
 
@@ -127,7 +157,9 @@ void EditorWindow::buildUi()
     root->addWidget(body, 1);
     auto* scTheme = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_T), this);
     connect(scTheme, &QShortcut::activated, this, [this]{
-        int next = (static_cast<int>(m_currentTheme) + 1) % 3;
+        // kThemeCount — единственная точка правки: при добавлении темы в enum
+        // цикл больше не уйдёт за пределы Theme (раньше здесь стоял хардкод % 3)
+        const int next = (static_cast<int>(m_currentTheme) + 1) % kThemeCount;
         applyTheme(static_cast<Theme>(next));
     });
     // ── Sidebar: узкая колонка с иконками режимов ──
@@ -145,10 +177,12 @@ void EditorWindow::buildUi()
         {"Карта связей...", "graph"},
         {"Машина времени...", "clock"},
         {"Заметки...", "pen"},
-        // === ДОБАВЬ ЭТУ СТРОЧКУ НИЖЕ ===
-        {"RTX Освещение: перетаскивай свет!", "sun"} 
+        {"RTX Освещение: перетаскивай свет!", "sun"}
     };
-    for (int i = 0; i < 6; ++i) { // Было 5, стало 6!
+    // Число кнопок выводится из размера defs — раньше здесь был хардкод,
+    // из-за которого добавление режима без правки цикла давало «мёртвую» кнопку.
+    constexpr int kModeCount = static_cast<int>(sizeof(defs) / sizeof(defs[0]));
+    for (int i = 0; i < kModeCount; ++i) {
         auto* b = new QPushButton(side);
         b->setObjectName("SideBtn");
         b->setCheckable(true);
@@ -171,6 +205,7 @@ void EditorWindow::buildUi()
     // Страница 0 — сцена редактора. Вертикальный стек:
     // [HUD?] → [шаблоны?] → [панель времени?] → редактор → консоль
     m_stage = new QWidget;
+    m_stage->setObjectName("Stage"); // без этого селектор QWidget#Stage в setBackground() не срабатывал
     auto *stageLay = new QVBoxLayout(m_stage);
     stageLay->setContentsMargins(12, 10, 12, 10);
     stageLay->setSpacing(8);
@@ -455,25 +490,30 @@ void EditorWindow::openFile()
         QDir::homePath(),
         QStringLiteral("Python Files (*.py);;All Files (*)"));
 
-    if (!fileName.isEmpty())
+    if (fileName.isEmpty())
+        return;
+
+    // Не теряем правки текущего документа
+    if (!maybeSave())
+        return;
+
+    QFile file(fileName);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        QFile file(fileName);
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text))
-        {
-            QTextStream in(&file);
-            m_editor->setPlainText(in.readAll()); // Загружаем содержимое в редактор
+        QTextStream in(&file);
+        m_editor->setPlainText(in.readAll()); // Загружаем содержимое в редактор
+        m_editor->document()->setModified(false);
 
-            m_currentFilePath = fileName; // Запоминаем путь
+        m_currentFilePath = fileName; // Запоминаем путь
 
-            // Обновляем заголовок окна, чтобы было видно имя файла
-            setWindowTitle(QStringLiteral("PyForge — %1").arg(QFileInfo(fileName).fileName()));
+        // Обновляем заголовок окна, чтобы было видно имя файла
+        setWindowTitle(QStringLiteral("PyForge — %1").arg(QFileInfo(fileName).fileName()));
 
-            file.close();
-        }
-        else
-        {
-            QMessageBox::warning(this, "Ошибка", "Не удалось прочитать файл.");
-        }
+        file.close();
+    }
+    else
+    {
+        QMessageBox::warning(this, "Ошибка", "Не удалось прочитать файл.");
     }
 }
 
@@ -493,8 +533,9 @@ void EditorWindow::saveFile()
         out << m_editor->toPlainText(); // Пишем текст из редактора на диск
         file.close();
 
-        // Можно показать тихое уведомление или просто обновить статус
-        QMessageBox::information(this, "Сохранение", QStringLiteral("Файл сохранен:\n%1").arg(m_currentFilePath));
+        // Снимаем флаг «изменён» — без него closeEvent считал бы файл несохранённым
+        m_editor->document()->setModified(false);
+        setWindowTitle(QStringLiteral("PyForge — %1").arg(QFileInfo(m_currentFilePath).fileName()));
     }
     else
     {
@@ -547,15 +588,15 @@ void EditorWindow::setBackground()
     // 3. Настраиваем прозрачность фона редактора, чтобы картинка просвечивала
     // Делаем фон CodeEditor полупрозрачным черным (альфа-канал 180 из 255)
     m_editor->setStyleSheet(QStringLiteral(
-        "#CodeEditor { background-color: rgba(16, 19, 26, 180); }"));
+        "QPlainTextEdit#CodeEditor { background-color: rgba(16, 19, 26, 180); }"));
 
     // 4. Применяем картинку как фон для всей страницы Stage (где лежит редактор)
     // Используем свойство border-image, которое растянет картинку на весь блок
-    QString bgUrl = fileName.replace('\\', '/'); // Windows любит обратные слеши, CSS их не понимает
+    QString bgUrl = QUrl::fromLocalFile(fileName).toString(); // корректное URI-экранирование пробелов, кириллицы и слэшей
 
     m_stage->setStyleSheet(QStringLiteral(
                                "QWidget#Stage {"
-                               "   background-image: url('%1');"
+                               "   background-image: url(\"%1\");"
                                "   background-repeat: no-repeat;"
                                "   background-position: center;"
                                "   background-size: cover;" // Растягиваем картинку, сохраняя пропорции
@@ -565,4 +606,47 @@ void EditorWindow::setBackground()
     // Принудительно обновляем внешний вид (polish нужен при динамической смене стилей)
     m_stage->style()->unpolish(m_stage);
     m_stage->style()->polish(m_stage);
+}
+
+// ─────────────── Контроль несохранённых изменений ───────────────
+
+// Сохраняет документ, если есть правки. Возвращает false, если пользователь
+// отменил сохранение — вызывающий должен прервать закрытие/перезагрузку.
+bool EditorWindow::maybeSave()
+{
+    if (!m_editor->document()->isModified())
+        return true;
+
+    const auto ret = QMessageBox::warning(
+        this, QStringLiteral("PyForge"),
+        QStringLiteral("Документ был изменён.\nСохранить изменения?"),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+    switch (ret) {
+    case QMessageBox::Save:
+        saveFile();
+        return !m_editor->document()->isModified(); // false, если saveAs отменили или запись упала
+    case QMessageBox::Discard:
+        return true;
+    default: // Cancel
+        return false;
+    }
+}
+
+void EditorWindow::closeEvent(QCloseEvent *e)
+{
+    if (maybeSave())
+        e->accept();
+    else
+        e->ignore();
+}
+
+// Обновляет заголовок окна: имя файла + «*», пока есть несохранённые правки.
+void EditorWindow::updateTitleBarPath()
+{
+    const QString name = m_currentFilePath.isEmpty()
+                             ? QStringLiteral("Безымянный")
+                             : QFileInfo(m_currentFilePath).fileName();
+    const QString star = m_editor->document()->isModified() ? QStringLiteral(" *") : QString();
+    setWindowTitle(QStringLiteral("PyForge — %1%2").arg(name, star));
 }
