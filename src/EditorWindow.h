@@ -32,7 +32,8 @@ public:
     explicit EditorWindow(QWidget* parent = nullptr);
     
 enum class Theme { Neon, Jungle, Medieval };
-Theme m_currentTheme = Theme::Neon;
+static constexpr int kThemeCount = 3;               // единая константа: тема + 1 != тема ⇒ выход за массив
+Theme currentTheme() const { return m_currentTheme; }
 void applyTheme(Theme theme);
 
 protected:
@@ -41,17 +42,21 @@ protected:
     void mousePressEvent(QMouseEvent*) override;    // ресайз безрамочного окна
     void mouseMoveEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
+    void closeEvent(QCloseEvent*) override;         // проверка несохранённых изменений
 
 private slots:
     void runScript();
-    void openFile();   // <--- НОВОЕ
-    void saveFile();   // <--- НОВОЕ
+    void openFile();
+    void saveFile();
     void saveAsFile();
-    void setBackground(); // <--- ДОБАВЬ ЭТУ СТРОЧКУ
+    void setBackground();
 
 private:
     void buildUi();
     void setMode(int mode);
+    bool maybeSave();                               // false — закрытие отменено
+    void updateTitleBarPath();                      // «путь + звёздочка» при правках
+    void resetStageStyleSheet();                    // снять inline-QSS после смены темы
 
     int  resizeEdges(const QPoint& pos) const;
     void updateCursorForEdges(int edges);
@@ -71,16 +76,16 @@ private:
     MindMapWidget*     m_map  = nullptr;
     TimeTravelModule*  m_time = nullptr;
     ScratchpadModule*  m_pad  = nullptr;
-    BackgroundManager* m_bgManager = nullptr;
-    RtxLightModule* m_rtx = nullptr; // <--- ДОБАВЬ ЭТУ СТРОЧКУ
+    RtxLightModule* m_rtx = nullptr;
     QProcess* m_process = nullptr;
     QString   m_lastStderr;                 // копим stderr для вердикта RPG-режима
-    int  m_mode = -1;                       // 0 стандарт · 1 RPG · 2 карта · 3 время · 4 заметки
+    int  m_mode = -1;                       // 0 стандарт · 1 RPG · 2 карта · 3 время · 4 заметки · 5 RTX
 
     // Состояние ресайза безрамочного окна
     int   m_edges = 0;
     QRect m_resizeStart;
     QPoint m_resizeMouse;
     QString m_currentFilePath;
-    QString m_bgImagePath; // <--- ДОБАВЬ ЭТУ СТРОЧКУ
+    QString m_bgImagePath;                  // активный фон сцены (пусто — фона нет)
+    Theme   m_currentTheme = Theme::Neon;   // была public — инкапсулирована через applyTheme/currentTheme
 };

@@ -7,7 +7,11 @@
 #include <QScrollArea>
 #include <QVBoxLayout>
 #include <QDir>
+#include <QUrl>
 
+// ВНИМАНИЕ: модуль пока не подключён к EditorWindow (мёртвый код).
+// Функциональность «своего фона» дублируется в EditorWindow::setBackground().
+// TODO: либо встроить панель пресетов в UI, либо удалить вместе с записью в CMakeLists.
 BackgroundManager::BackgroundManager(CodeEditor* editor, QWidget* parent)
     : QWidget(parent), m_editor(editor) {
     setObjectName("BackgroundManager");
@@ -68,9 +72,10 @@ void BackgroundManager::onLoadCustom() {
 }
 
 void BackgroundManager::applyBackground(const QString& path) {
-    QString url = path;
-    url.replace('\\', '/');
+    // QUrl::fromLocalFile даёт корректный file:// URI (экранирует пробелы,
+    // кириллицу и обратные слеши Windows); в QSS url() — только в двойных кавычках
+    const QString url = QUrl::fromLocalFile(path).toString();
     m_editor->setStyleSheet(QString(
-        "QPlainTextEdit#CodeEditor{background-image:url('%1');"
+        "QPlainTextEdit#CodeEditor{background-image:url(\"%1\");"
         "background-repeat:no-repeat;background-position:center;}").arg(url));
 }
