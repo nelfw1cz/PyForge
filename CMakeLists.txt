@@ -22,6 +22,9 @@ add_executable(pyforge
     src/modes/ScratchpadModule.cpp
     src/modes/RtxLightModule.cpp
     src/EditorWindow.cpp
+    src/theme/JungleTheme.cpp
+    src/theme/MedievalTheme.cpp
+    src/ui/BackgroundManager.cpp
 )
 
 target_link_libraries(pyforge PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
